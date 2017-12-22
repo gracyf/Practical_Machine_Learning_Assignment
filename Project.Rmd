@@ -1,0 +1,210 @@
+---
+title: "Practical Machine Learning Project"
+author: "Gracy"
+date: "22 December 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+```
+
+
+###OVERVIEW
+
+This to predict the manner in which 6 participants performed some exercise as described below. This is the "classe" variable in the training set. The machine learning algorithm described here is applied to the 20 test cases available in the test data and the predictions are submitted in appropriate format to the Course Project Prediction Quiz for automated grading.
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+
+###Environment Setting and Read files into R
+```{r freememory}
+rm(list=ls()) 
+```
+
+```{r wd}
+#Set the working environment. Switch to required directory
+setwd("C:/Users/Gracy/Coursera - Data Science Specialization/Course 8 - Practical Machine Learning/Week 4")
+```
+
+```{r url}
+fileUrl.train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+fileUrl.test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+```{r downloadfile}
+#download.file(fileUrl.train,destfile = "pml-training.csv")
+#download.file(fileUrl.test,destfile = "pml-testing.csv")
+```
+
+
+```{r load_lib,warning=FALSE}
+library(caret)
+library(parallel)
+library(doParallel)
+library(dplyr)
+```
+
+```{r readfiles}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+dim(testing)
+dim(training)
+```
+
+###Clean up the Data
+
+```{r remove_NA}
+# remove variables with Nearly Zero Variance
+NZV <- nearZeroVar(training)
+training <- training[, -NZV]
+testing  <- testing[, -NZV]
+dim(training)
+dim(testing)
+```
+
+```{r removeNA}
+# remove variables that are mostly NA
+AllNA    <- sapply(training, function(x) mean(is.na(x))) > 0.95
+training <- training[, AllNA==FALSE]
+testing  <- testing[, AllNA==FALSE]
+dim(training)
+dim(testing)
+```
+
+```{r removeidentification}
+# remove identification only variables (columns 1 to 5)
+training <- training[, -(1:5)]
+testing  <- testing[, -(1:5)]
+dim(training)
+dim(testing)
+```
+
+### Making an initial fit with all predictors for feature selection
+To improve processing time of the multiple executions of the train() function, caret supports the parallel processing capabilities of the parallel package. Parallel processing in caret can be accomplished with the parallel and doParallel packages. 
+```{r random_forest_fit}
+#Method: Random Forest
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+fit <- train(classe ~ ., method="rf",data=training,trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+```
+
+###Feature Selection using Variable Importance method
+
+The varImp process chooses the best 20 predictors and those are the columns selected for testing and training data.
+```{r variable_importance}
+var.imp <- varImp(fit)
+var.imp
+var.imp.cols.train <- c("num_window","roll_belt", "pitch_forearm","yaw_belt",     "magnet_dumbbell_z","pitch_belt",      "magnet_dumbbell_y",
+"roll_forearm",     "accel_dumbbell_y", "magnet_dumbbell_x","accel_forearm_x",  "roll_dumbbell",    
+"accel_belt_z",     "total_accel_dumbbell","accel_dumbbell_z", "magnet_belt_z",          "magnet_forearm_z",       
+"magnet_belt_y",          "magnet_belt_x",          "roll_arm" , "classe")
+var.imp.cols.test <- c("num_window","roll_belt", "pitch_forearm","yaw_belt",     "magnet_dumbbell_z","pitch_belt",      "magnet_dumbbell_y",
+"roll_forearm",     "accel_dumbbell_y", "magnet_dumbbell_x","accel_forearm_x",  "roll_dumbbell",    
+"accel_belt_z",     "total_accel_dumbbell","accel_dumbbell_z", "magnet_belt_z",          "magnet_forearm_z",       
+"magnet_belt_y",          "magnet_belt_x",          "roll_arm" )
+training <- training[,c(var.imp.cols.train)]
+testing <- testing[,c(var.imp.cols.test)]
+
+plot(var.imp)
+```
+
+
+###Best Fit
+This best fit method of leaps library calculates the best predictors using residual sum of squares measure. We find that after the first 15 features the remaining variables are not of much importance. So we proced on to the final fit methods with these 15 predictors.
+
+```{r best_fit}
+#best fit
+library(leaps)
+# Perform a best fit
+bestFit=regsubsets(classe~.,training,nvmax=15)
+
+# Generate a summary of the fit
+bfSummary=summary(bestFit)
+
+# Plot the Residual Sum of Squares vs number of variables 
+plot(bfSummary$rss,xlab="Number of Variables",ylab="RSS",type="l",main="Best fit RSS vs No of features")
+# Get the index of the minimum value
+
+a=which.min(bfSummary$rss)
+# Mark this in red
+points(a,bfSummary$rss[a],col="red",cex=2,pch=20)
+#The plot below shows that the Best fit occurs with all 15 features included. Notice that there is no significant change in RSS from 15 features onward.
+```
+
+
+###Random Forest ( with final set of predictors)
+```{r random_forest_fit_final}
+#Method: Random Forest
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+finalfit1 <- train(classe ~ ., method="rf",data=training,trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+
+result1 <- confusionMatrix(finalfit1)
+result1
+plot(result1$table, col = result1$byClass, main = "Random Forest")
+```
+
+
+###Decision Trees
+```{r decision_trees}
+#Method: Decision Trees
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+finalfit2 <- train(classe ~ ., method="rpart",data=training,trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+result2 <- confusionMatrix(finalfit2)
+result2
+plot(result2$table, col = result2$byClass, main = "Decision Trees")
+```
+
+
+
+###Gradient Boosting
+```{r gradient_boosting}
+#Method: Gradient Boost
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+finalfit3 <- train(classe ~ ., method="gbm",data=training,trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+result3 <- confusionMatrix(finalfit3)
+result3
+plot(result3$table, col = result3$byClass, main = "Gradient Boost")
+```
+
+The accuracy of the above 3 regression modeling methods are:
+
+Random Forest : 0.9979
+Decision Tree : 0.544
+GBM : 0.9924
+
+####PREDICTION with best model - Random Forest
+The required accuracy for this project is achieved from Random Forest. Therefore predicting with that model.
+```{r predict}
+prediction <- predict(finalfit1,newdata = testing)
+prediction
+```
