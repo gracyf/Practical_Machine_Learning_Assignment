@@ -207,4 +207,19 @@ The required accuracy for this project is achieved from Random Forest. Therefore
 ```{r predict}
 prediction <- predict(finalfit1,newdata = testing)
 prediction
+
 ```
+
+####Out of Sample Error
+
+
+```{r sample_error}
+outOfSampleError.accuracy <- sum(prediction == testing$classe)/length(prediction)
+
+outOfSampleError.accuracy
+
+outOfSampleError <- 1 - outOfSampleError.accuracy
+
+outOfSampleError
+```
+

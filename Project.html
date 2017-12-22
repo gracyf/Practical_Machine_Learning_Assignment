@@ -139,22 +139,10 @@ setwd(&quot;C:/Users/Gracy/Coursera - Data Science Specialization/Course 8 - Pra
 fileUrl.test &lt;- &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;</code></pre>
 <pre class="r"><code>#download.file(fileUrl.train,destfile = &quot;pml-training.csv&quot;)
 #download.file(fileUrl.test,destfile = &quot;pml-testing.csv&quot;)</code></pre>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: lattice</code></pre>
-<pre><code>## Loading required package: ggplot2</code></pre>
-<pre class="r"><code>library(parallel)
-library(doParallel)</code></pre>
-<pre><code>## Loading required package: foreach</code></pre>
-<pre><code>## Loading required package: iterators</code></pre>
-<pre class="r"><code>library(dplyr)</code></pre>
-<pre><code>## 
-## Attaching package: 'dplyr'</code></pre>
-<pre><code>## The following objects are masked from 'package:stats':
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(caret)
+library(parallel)
+library(doParallel)
+library(dplyr)</code></pre>
 <pre class="r"><code>training &lt;- read.csv(&quot;pml-training.csv&quot;)
 testing &lt;- read.csv(&quot;pml-testing.csv&quot;)
 dim(testing)</code></pre>
@@ -384,6 +372,18 @@ result3</code></pre>
 prediction</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
+</div>
+<div id="out-of-sample-error" class="section level4">
+<h4>Out of Sample Error</h4>
+<pre class="r"><code>outOfSampleError.accuracy &lt;- sum(prediction == testing$classe)/length(prediction)</code></pre>
+<pre><code>## Warning in is.na(e2): is.na() applied to non-(list or vector) of type
+## 'NULL'</code></pre>
+<pre class="r"><code>outOfSampleError.accuracy</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>outOfSampleError &lt;- 1 - outOfSampleError.accuracy
+
+outOfSampleError</code></pre>
+<pre><code>## [1] 1</code></pre>
 </div>
 </div>
 
